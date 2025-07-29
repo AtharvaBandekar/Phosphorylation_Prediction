@@ -1,0 +1,8 @@
+# Ignore large data files
+data/raw/Homo_sapiens.txt
+data/raw/uniprot_mapping.fasta  # Your main UniProt fasta download
+data/raw/Homo_sapiens.fasta     # The fasta that came with EPSD
+data/raw/*.txt                   # This will ignore all .txt files in data/raw
+data/raw/*.fasta                 # This will ignore all .fasta files in data/raw
+
+.DS_Store
