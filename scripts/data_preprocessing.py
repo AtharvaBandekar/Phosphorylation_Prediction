@@ -2,6 +2,11 @@ from Bio import SeqIO
 import os
 import pandas as pd
 import random
+import numpy as np
+import torch
+from sklearn.model_selection import train_test_split
+from torch.utils.data import Dataset, DataLoader
+import pickle
 
 # Parse fasta file and create a {UniProt ID: Sequence} dictionary 
 script_dir = os.path.dirname(__file__)
@@ -118,3 +123,88 @@ num_neg_to_sample = min(num_positive_samples, len(all_negative_candidates))
 negative_samples = random.sample(all_negative_candidates, num_neg_to_sample)
 
 print(f"Selected {len(negative_samples)} negative samples for a balanced dataset.")
+
+# Amino acid encoding
+amino_acids = "ACDEFGHIKLMNPQRSTVWXY"
+aa_to_int = {aa: i for i, aa in enumerate(amino_acids)}
+num_amino_acids = len(amino_acids)
+
+def one_hot_encode_sequence(sequence, aa_to_int_map, num_aa):
+    encoded_sequence = torch.zeros(len(sequence), num_aa)
+
+    for i, aa in enumerate(sequence):
+        if aa in aa_to_int_map:
+            encoded_sequence[i, aa_to_int_map[aa]] = 1
+        else:
+            print(f"Warning: Unknown amino acid '{aa}' encountered.")
+            pass
+    return encoded_sequence
+
+
+# Combining and randomizing samples
+all_samples = positive_samples + negative_samples
+random.shuffle(all_samples)
+print(f"Total combined samples after balancing: {len(all_samples)}")
+
+# Train-validation-test split
+train_ratio = 0.65
+val_ratio = 0.15
+test_ratio = 0.2
+
+train_data, temp_data = train_test_split(all_samples, test_size=(val_ratio + test_ratio), random_state=42)
+val_data, test_data = train_test_split(temp_data, test_size=(test_ratio / (val_ratio + test_ratio)), random_state=42)
+
+print(f"Train samples: {len(train_data)}")
+print(f"Validation samples: {len(val_data)}")
+print(f"Test samples: {len(test_data)}")
+
+# Create a Dataset class
+class PhosphoDataset(Dataset):
+    def __init__(self, data_list, aa_to_int_map, num_aa):
+        self.data = data_list
+        self.aa_to_int_map = aa_to_int_map
+        self.num_aa = num_aa
+
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, index):
+        sequence, label = self.data[index]
+        encoded_sequence = one_hot_encode_sequence(sequence, self.aa_to_int_map, self.num_aa)
+        label_tensor = torch.tensor(label, dtype=torch.float32) 
+        return encoded_sequence, label_tensor
+    
+# Create DataLoaders
+train_dataset = PhosphoDataset(train_data, aa_to_int, num_amino_acids)
+val_dataset = PhosphoDataset(val_data, aa_to_int, num_amino_acids)
+test_dataset = PhosphoDataset(test_data, aa_to_int, num_amino_acids)
+
+batch_size = 64
+
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+print(f"Train batches: {len(train_loader)}")
+print(f"Validation batches: {len(val_loader)}")
+print(f"Test batches: {len(test_loader)}")
+
+# Saved the processed data
+processed_data_dir = os.path.join(script_dir, '..', 'data', 'processed')
+os.makedirs(processed_data_dir, exist_ok=True)
+
+with open(os.path.join(processed_data_dir, 'train_data.pkl'), 'wb') as f:
+    pickle.dump(train_data, f)
+with open(os.path.join(processed_data_dir, 'val_data.pkl'), 'wb') as f:
+    pickle.dump(val_data, f)
+with open(os.path.join(processed_data_dir, 'test_data.pkl'), 'wb') as f:
+    pickle.dump(test_data, f)
+
+print("Processed train, validation, and test data saved to 'data/processed/'")
+
+
+
+
+
+
+
