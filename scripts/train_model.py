@@ -18,7 +18,7 @@ SEQUENCE_LENGTH = 21
 KERNEL_SIZE = 5      
 BATCH_SIZE = 64
 LEARNING_RATE = 0.0005
-NUM_EPOCHS = 20
+NUM_EPOCHS = 30
 
 # Device Configuration
 if torch.backends.mps.is_available():
